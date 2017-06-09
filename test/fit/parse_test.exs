@@ -7,12 +7,12 @@ defmodule Fit.ParseTest do
   end
 
   test "read some records", %{fit: fit} do
-    {header, rest} = Fit.Header.parse fit
-    {recordheader, rest} = Fit.RecordHeader.parse rest
+    {header, rest} = Fit.Header.parse fit # 14:14
+    {recordheader, rest} = Fit.RecordHeader.parse rest # 1:15
     assert recordheader.header_type == :definition
-    {def_record, rest} = Fit.DefinitionRecord.parse rest
-    {recordheader, rest} = Fit.RecordHeader.parse rest
+    {def_record, rest} = Fit.DefinitionRecord.parse rest # 26:41
+    {recordheader, rest} = Fit.RecordHeader.parse rest # 1:42
     assert recordheader.header_type == :data
-    # {data_record, _rest} = Fit.DataRecord.parse rest
+    {data_record, _rest} = Fit.DataRecord.parse(rest,recordheader)
   end
 end

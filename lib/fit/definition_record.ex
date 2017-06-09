@@ -27,12 +27,13 @@ defmodule Fit.DefinitionRecord do
       base_num::5,
       rest::binary
     >> = data
-    f = %{
-          field_def_num: field_def_num,
-          size: size,
-          endianness: endianness,
-          base_num: base_num
-        }
+    # f = %{
+    #       field_def_num: field_def_num,
+    #       size: size,
+    #       endianness: endianness,
+    #       base_num: base_num
+    #     }
+    f = {field_def_num, size, endianness, base_num}
     parse_field_def(rest, num_fields-1, [f | fields])
   end
 

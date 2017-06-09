@@ -1,77 +1,168 @@
 defmodule Fit.DataRecord do
-  def parse(data, definition) do
-    d = <<71, 146, 153, 232, 54, 153, 107, 49, 255, 255, 255, 255, 1, 0, 44, 7, 255,
-  255, 4, 65, 0, 0, 49, 0, 2, 0, 2, 132, 1, 1, 2, 1, 188, 2, 255, 66, 0, 0, 21,
-  0, 5, 253, 4, 134, 3, 4, 134, 0, 1, 0>>
-  # %{base_num: 4, endianness: 1, field_def_num: 1, size: 2}
+  def parse(%{endian: endian, global_msg: _, fields: fields}, data) do
+    parse_fields(fields, endian, [], data)
   end
 
-  # def parse_data_field(data, field_defs, fields) do
-  #   [field_def | field_defs] = field_defs
-  #   case field_def do
-  #
-  #   end
-  # end
-  #
-  # def parse_data_field(rest, [], fields) do
-  #   {fields, rest}
-  # end
+  def parse_fields([], _, fields, data) do
+    {fields, data}
+  end
+  def parse_fields(field_defs, endian, fields, data) do
+    [fdef | tail] = field_defs
+    {parsed, rest} = parse_field(fdef, endian, data)
+    parse_fields(tail, endian, [parsed|fields], rest)
+  end
 
-  def parse_data_field(%{base_num: base, endianness: :little, field_def_num: def_num, size: size}, data) do
-    case base do
-      0 -> <<field, rest::binary>> = data
-      1 -> <<field::signed-integer, rest::binary>> = data
-      2 -> <<field, rest::binary>> = data
-      3 -> <<field::signed-little-integer-unit(8)-size(2), rest::binary>> = data
-      3 -> <<field::little-integer-unit(8)-size(2), rest::binary>> = data
+  def parse_field(%{base_num: base_num, field_def_num: field_def_num, size: size}, endian, data) do
+    {value, data} = parse_data(base_num, endian, size, data, [])
+    {{field_def_num, value}, data}
+  end
+
+  def parse_data(_, _, 0, data, value) do
+    {value, data}
+  end
+  def parse_data(0, endian, size, data, value) do
+    <<field, rest::binary>> = data
+    parse_data(0, endian, size-1, rest, validate_field(field, 255, value))
+  end
+  def parse_data(1, endian, size, data, value) do
+    <<field::signed-integer, rest::binary>> = data
+    parse_data(1, endian, size-1, rest, validate_field(field, 127, value))
+  end
+  def parse_data(2, endian, size, data, value) do
+    <<field, rest::binary>> = data
+    parse_data(2, endian, size-1, rest, validate_field(field, 255, value))
+  end
+  def parse_data(3, endian, size, data, value) do
+    invalid = 32767
+    case endian do
+      :little ->
+        <<field::signed-little-integer-unit(8)-size(2), rest::binary>> = data
+        parse_data(3, endian, size-2, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::signed-integer-unit(8)-size(2), rest::binary>> = data
+        parse_data(4, endian, size-2, rest, validate_field(field, invalid, value))
     end
   end
-  def parse_data_field(%{base_num: base, endianness: :big, field_def_num: def_num, size: size}, data) do
+  def parse_data(4, endian, size, data, value) do
+    invalid = 65535
+    case endian do
+      :little ->
+        <<field::little-integer-unit(8)-size(2), rest::binary>> = data
+        parse_data(4, endian, size-2, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::integer-unit(8)-size(2), rest::binary>> = data
+        parse_data(4, endian, size-2, rest, validate_field(field, invalid, value))
+    end
+  end
+  def parse_data(5, endian, size, data, value) do
+    invalid = 2147483647
+    case endian do
+      :little ->
+        <<field::signed-little-integer-unit(8)-size(4), rest::binary>> = data
+        parse_data(5, endian, size-4, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::signed-integer-unit(8)-size(4), rest::binary>> = data
+        parse_data(5, endian, size-4, rest, validate_field(field, invalid, value))
+    end
+  end
+  def parse_data(6, endian, size, data, value) do
+    invalid = 4294967295
+    case endian do
+      :little ->
+        <<field::little-integer-unit(8)-size(4), rest::binary>> = data
+        parse_data(6, endian, size-4, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::integer-unit(8)-size(4), rest::binary>> = data
+        parse_data(6, endian, size-4, rest, validate_field(field, invalid, value))
+    end
+  end
+  def parse_data(7, endian, size, data, value) do
+    <<field::utf8, rest::binary>> = data
+    parse_data(7, endian, size-1, rest, validate_field(field, 0, value))
+  end
+  def parse_data(8, endian, size, data, value) do
+    invalid = 4294967295
+    case endian do
+      :little ->
+        <<field::little-float-unit(8)-size(4), rest::binary>> = data
+        parse_data(8, endian, size-4, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::float-unit(8)-size(4), rest::binary>> = data
+        parse_data(8, endian, size-4, rest, validate_field(field, invalid, value))
+    end
+  end
+  def parse_data(9, endian, size, data, value) do
+    invalid = 18446744073709551615
+    case endian do
+      :little ->
+        <<field::signed-little-float-unit(8)-size(8), rest::binary>> = data
+        parse_data(9, endian, size-8, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::signed-float-unit(8)-size(8), rest::binary>> = data
+        parse_data(9, endian, size-8, rest, validate_field(field, invalid, value))
+    end
+  end
+  def parse_data(10, endian, size, data, value) do
+    <<field, rest::binary>> = data
+    parse_data(10, endian, size-1, rest, validate_field(field, 0, value))
+  end
+  def parse_data(11, endian, size, data, value) do
+    invalid = 0
+    case endian do
+      :little ->
+        <<field::little-integer-unit(8)-size(2), rest::binary>> = data
+        parse_data(11, endian, size-2, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::integer-unit(8)-size(2), rest::binary>> = data
+        parse_data(11, endian, size-2, rest, validate_field(field, invalid, value))
+    end
+  end
+  def parse_data(12, endian, size, data, value) do
+    invalid = 0
+    case endian do
+      :little ->
+        <<field::little-integer-unit(8)-size(4), rest::binary>> = data
+        parse_data(12, endian, size-4, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::integer-unit(8)-size(4), rest::binary>> = data
+        parse_data(12, endian, size-4, rest, validate_field(field, invalid, value))
+    end
+  end
+  def parse_data(13, endian, size, data, value) do
+    <<field, rest::binary>> = data
+    parse_data(0, endian, size-1, rest, validate_field(field, 0xFF, value))
+  end
+  def parse_data(14, endian, size, data, value) do
+    invalid = 0x7FFFFFFFFFFFFFFF
+    case endian do
+      :little ->
+        <<field::little-signed-integer-unit(8)-size(8), rest::binary>> = data
+        parse_data(14, endian, size-8, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::integer-signed-unit(8)-size(8), rest::binary>> = data
+        parse_data(14, endian, size-8, rest, validate_field(field, invalid, value))
+    end
+  end
+  def parse_data(15, endian, size, data, value) do
+    invalid = 0x7FFFFFFFFFFFFFFF
+    case endian do
+      :little ->
+        <<field::little-integer-unit(8)-size(8), rest::binary>> = data
+        parse_data(6, endian, size-4, rest, validate_field(field, invalid, value))
+      :big ->
+        <<field::integer-unit(8)-size(8), rest::binary>> = data
+        parse_data(6, endian, size-4, rest, validate_field(field, invalid, value))
+    end
+  end
+  def parse_data(16, endian, size, data, value) do
+    <<field::64, rest::binary>> = data
+    parse_data(16, endian, size-8, rest, validate_field(field, 0, value))
   end
 
-  # def parse_data_field(data, %{base_num: 0}) do
-  #   <<field, rest::binary>> = data
-  # end
-  # def parse_data_field(data, %{base_num: 1}) do
-  #   <<field::signed-integer, rest::binary>> = data
-  # end
-  # def parse_data_field(data, %{base_num: 2}) do
-  #   <<field, rest::binary>> = data
-  # end
-  # def parse_data_field(data, %{base_num: 3, endian: endian}) do
-  #   case endian do
-  #     :little -> <<field::signed-little-integer-unit(8)-size(2), rest::binary>> = data
-  #     :big -> <<field::signed-integer-unit(8)-size(2), rest::binary>> = data
-  #   end
-  # end
-  # def parse_data_field(data, %{base_num: 4, endian: endian}) do
-  #   case endian do
-  #     :little -> <<field::little-integer-unit(8)-size(2), rest::binary>> = data
-  #     :big -> <<field::integer-unit(8)-size(2), rest::binary>> = data
-  #   end
-  # end
-  # def parse_data_field(data, %{base_num: 5, endian: endian}) do
-  # end
-  # def parse_data_field(data, %{base_num: 6, endian: endian}) do
-  # end
-  # def parse_data_field(data, %{base_num: 7}) do
-  # end
-  # def parse_data_field(data, %{base_num: 8, endian: endian}) do
-  # end
-  # def parse_data_field(data, %{base_num: 9, endian: endian}) do
-  # end
-  # def parse_data_field(data, %{base_num: 10}) do
-  # end
-  # def parse_data_field(data, %{base_num: 11}) do
-  # end
-  # def parse_data_field(data, %{base_num: 12}) do
-  # end
-  # def parse_data_field(data, %{base_num: 13}) do
-  # end
-  # def parse_data_field(data, %{base_num: 14}) do
-  # end
-  # def parse_data_field(data, %{base_num: 15}) do
-  # end
-  # def parse_data_field(data, %{base_num: 16}) do
-  # end
+  def validate_field(field, invalid, values) do
+    unless field == invalid do
+      values = [field | values]
+    end
+    values
+  end
 end
