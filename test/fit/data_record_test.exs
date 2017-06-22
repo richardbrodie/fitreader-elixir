@@ -18,12 +18,21 @@ defmodule Fit.DataRecordTest do
       %{base_num: 12, endianness: 1, field_def_num: 3, size: 4}
     ]
 
-    {result, _rest} = Fit.DataRecord.parse(%{endian: :big, global_msg: 0, num_fields: 7, fields: fields}, raw_data)
+    {result, _rest} = Fit.DataRecord.parse(%{endian: :big, global_msg: 0, num_fields: 7, field_defs: fields}, raw_data)
     {:ok, result: result}
   end
 
   test "parses data field", %{result: result} do
-    assert [{3, [134217476]}, {4, [4278255660]}, {7, [838860799]}, {1, [39275]},
- {2, [59446]}, {5, [37529]}, {0, 'G'}] == result
+    assert  %Fit.DataRecord{
+      fields: [
+        {3, [134217476]},
+        {4, [4278255660]},
+        {7, [838860799]},
+        {1, [39275]},
+        {2, [59446]},
+        {5, [37529]},
+        {0, 'G'}],
+      global_num: 0
+    } == result
   end
 end

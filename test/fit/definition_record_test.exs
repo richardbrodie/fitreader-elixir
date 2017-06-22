@@ -12,7 +12,7 @@ defmodule Fit.DefinitionRecordTest do
     assert def_record.endian == :little
     assert def_record.global_msg == 0
     assert def_record.num_fields == 7
-    assert length(def_record.fields) == 7
+    assert length(def_record.field_defs) == 7
     # fields: [
     #   %{base_num: 0, endianness: 0, field_def_num: 0, size: 1},
     #   %{base_num: 4, endianness: 1, field_def_num: 5, size: 2},

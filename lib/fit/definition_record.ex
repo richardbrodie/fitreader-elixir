@@ -1,4 +1,5 @@
 defmodule Fit.DefinitionRecord do
+  defstruct [:endian, :global_msg, :num_fields, :field_defs]
   def parse(<< def_record::binary-size(5), rest::binary >>) do
     meta = case def_record do
       << _reserved     ::little-8,
@@ -15,7 +16,7 @@ defmodule Fit.DefinitionRecord do
         %{endian: :big, global_msg: global_msg, num_fields: num_fields}
     end
     {fields, rest} = parse_field_def(rest, meta.num_fields, [])
-    {Map.put(meta, :fields, fields), rest}
+    {Map.put(meta, :field_defs, fields), rest}
   end
 
   def parse_field_def(data, num_fields, fields) when num_fields > 0 do
@@ -27,13 +28,13 @@ defmodule Fit.DefinitionRecord do
       base_num::5,
       rest::binary
     >> = data
-    # f = %{
-    #       field_def_num: field_def_num,
-    #       size: size,
-    #       endianness: endianness,
-    #       base_num: base_num
-    #     }
-    f = {field_def_num, size, endianness, base_num}
+    f = %{
+          field_def_num: field_def_num,
+          size: size,
+          endianness: endianness,
+          base_num: base_num
+        }
+    # f = {field_def_num, size, endianness, base_num}
     parse_field_def(rest, num_fields-1, [f | fields])
   end
 

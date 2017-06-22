@@ -1,6 +1,8 @@
 defmodule Fit.DataRecord do
-  def parse(%{endian: endian, global_msg: _, fields: fields}, data) do
-    parse_fields(fields, endian, [], data)
+  defstruct [:global_num, :fields]
+  def parse(%{endian: endian, global_msg: global, field_defs: fields}, data) do
+    {fields, rest} = parse_fields(fields, endian, [], data)
+    {%Fit.DataRecord{global_num: global, fields: fields}, rest}
   end
 
   def parse_fields([], _, fields, data) do
@@ -77,8 +79,9 @@ defmodule Fit.DataRecord do
     end
   end
   def parse_data(7, endian, size, data, value) do
-    <<field::utf8, rest::binary>> = data
-    parse_data(7, endian, size-1, rest, validate_field(field, 0, value))
+    <<raw::binary-size(size), rest::binary>> = data
+    field = Enum.filter(String.to_charlist(raw), fn x -> x > 0 end)
+    parse_data(7, endian, 0, rest, [field|value])
   end
   def parse_data(8, endian, size, data, value) do
     invalid = 4294967295
