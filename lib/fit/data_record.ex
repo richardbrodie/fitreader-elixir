@@ -1,7 +1,7 @@
 defmodule Fit.DataRecord do
   defstruct [:global_num, :fields]
   def parse(%{endian: endian, global_msg: global, field_defs: fields}, data) do
-    {fields, rest} = parse_fields(Enum.reverse(fields), endian, [], data)
+    {fields, rest} = parse_fields(fields, endian, [], data)
     {%Fit.DataRecord{global_num: global, fields: fields}, rest}
   end
 

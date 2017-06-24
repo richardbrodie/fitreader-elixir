@@ -34,8 +34,7 @@ defmodule Fit.DefinitionRecord do
           endianness: endianness,
           base_num: base_num
         }
-    # f = {field_def_num, size, endianness, base_num}
-    parse_field_def(rest, num_fields-1, [f | fields])
+    parse_field_def(rest, num_fields-1, fields ++ [f])
   end
 
   def parse_field_def(rest, 0, fields) do
