@@ -1,17 +1,19 @@
 defmodule Fit.RecordRegistry do
   use GenServer
 
-  ## Client API
+  #
+  # Client API
+  #
 
   def start_link do
     GenServer.start_link(__MODULE__, :ok, name: :records)
   end
 
-  def add_definition({local_type, def_record}) do
-    GenServer.cast(:records, {:add_definition, {local_type, def_record}})
+  def add_definition(local_type, def_record) do
+    GenServer.cast(:records, {:add_definition, local_type, def_record})
   end
-  def add_datarecord({local_type, data}) do
-    GenServer.cast(:records, {:add_datarecord, {local_type, data}})
+  def add_datarecord(local_type, data) do
+    GenServer.cast(:records, {:add_datarecord, local_type, data})
   end
   def flush do
     GenServer.cast(:records, :flush)
@@ -24,13 +26,19 @@ defmodule Fit.RecordRegistry do
     GenServer.call(:records, {:get_data, id})
   end
 
-  ## Callbacks
+  #
+  # Callbacks
+  #
+
+  # init
 
   def init(:ok) do
     {:ok, {%{}, %{}}}
   end
 
-  def handle_cast({:add_definition, {local_type, def_record}}, {def_records, data_records}) do
+  # cast
+
+  def handle_cast({:add_definition, local_type, def_record}, {def_records, data_records}) do
     case Map.has_key?(def_records, local_type) do
       true ->
         {old_def, def_records} = Map.get_and_update(def_records, local_type, fn c -> {c, def_record} end)
@@ -41,7 +49,8 @@ defmodule Fit.RecordRegistry do
     end
     {:noreply, {def_records, data_records}}
   end
-  def handle_cast({:add_datarecord, {local_type, data}}, {def_records, data_records}) do
+
+  def handle_cast({:add_datarecord, local_type, data}, {def_records, data_records}) do
     case Map.has_key?(data_records, local_type) do
       true ->
         data_records = Map.update(data_records, local_type, [data], fn d -> [data | d] end)
@@ -50,22 +59,31 @@ defmodule Fit.RecordRegistry do
     end
     {:noreply, {def_records, data_records}}
   end
+
   def handle_cast(:flush, {def_records, data_records}) do
     def_list = Map.to_list(def_records)
     flush(def_list, data_records)
     {:noreply, {def_records, data_records}}
   end
 
+  # call
+
   def handle_call({:get_def, id}, _from, {def_records, data_records}) do
     {:reply, Map.fetch(def_records, id), {def_records, data_records}}
   end
+
   def handle_call({:get_data, id}, _from, {def_records, data_records}) do
     {:reply, Map.fetch(data_records, id), {def_records, data_records}}
   end
 
+  #
+  # Private
+  #
+
   defp flush([], _data_records) do
     :ok
   end
+
   defp flush([{local_type, def_record}|tail], data_records) do
     {data, data_records} = Map.pop(data_records, local_type)
     Fit.Message.process(local_type, def_record, data)
