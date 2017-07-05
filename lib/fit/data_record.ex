@@ -5,18 +5,19 @@ defmodule Fit.DataRecord do
     {%Fit.DataRecord{global_num: global, fields: fields}, rest}
   end
 
-  def parse_fields([], _, fields, data) do
-    {fields, data}
-  end
+  def parse_fields([], _, fields, data), do: {fields, data}
   def parse_fields(field_defs, endian, fields, data) do
     [%{base_num: base_num, field_def_num: field_def_num, size: size} | tail] = field_defs
-    {value, rest} = parse_data(base_num, endian, size, data, [])
-    parse_fields(tail, endian, [{field_def_num, value}|fields], rest)
+    # {value, rest} = parse_data(base_num, endian, size, data, [])
+    case parse_data(base_num, endian, size, data, []) do
+      {[], rest} ->
+        parse_fields(tail, endian, fields, rest)
+      {value, rest} ->
+        parse_fields(tail, endian, [{field_def_num, value}|fields], rest)
+    end
   end
 
-  def parse_data(_, _, 0, data, value) do
-    {value, data}
-  end
+  def parse_data(_, _, 0, data, value), do: {value, data}
   def parse_data(0, endian, size, data, value) do
     <<field, rest::binary>> = data
     parse_data(0, endian, size-1, rest, validate_field(field, 255, value))

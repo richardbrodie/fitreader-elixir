@@ -5,19 +5,12 @@ defmodule Fit do
 
   @doc """
   Hello world.
-
-  ## Examples
-
-      iex> Fit.hello
-      :world
-
   """
   def hello do
     :world
   end
 
   def read do
-    # :ets.new(:defs_registry, [:named_table])
     {:ok, _reg_pid} = Fit.RecordRegistry.start_link
     {:ok, _msg_pid} = Fit.Message.start_link
     {:ok, fit} = File.read('test/2016-04-09-13-19-18.fit')
@@ -27,6 +20,7 @@ defmodule Fit do
 
   def read_record(<<>>) do
     Fit.RecordRegistry.flush
+    # :ok
   end
   def read_record(data) do
     {recordheader, rest} = Fit.RecordHeader.parse data

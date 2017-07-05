@@ -22,9 +22,9 @@ defmodule Fit.RecordRegistry do
   def get_definition(id) do
     GenServer.call(:records, {:get_def, id})
   end
-  def get_datarecords(id) do
-    GenServer.call(:records, {:get_data, id})
-  end
+  # def get_datarecords(id) do
+  #   GenServer.call(:records, {:get_data, id})
+  # end
 
   #
   # Callbacks
@@ -41,9 +41,9 @@ defmodule Fit.RecordRegistry do
   def handle_cast({:add_definition, local_type, def_record}, {def_records, data_records}) do
     case Map.has_key?(def_records, local_type) do
       true ->
-        {old_def, def_records} = Map.get_and_update(def_records, local_type, fn c -> {c, def_record} end)
+        {_old_def, def_records} = Map.get_and_update(def_records, local_type, fn c -> {c, def_record} end)
         {data, data_records} = Map.pop(data_records, local_type)
-        Fit.Message.process(local_type, old_def, data)
+        Fit.Message.process(data)
       false ->
         def_records = Map.put(def_records, local_type, def_record)
     end
@@ -63,7 +63,7 @@ defmodule Fit.RecordRegistry do
   def handle_cast(:flush, {def_records, data_records}) do
     def_list = Map.to_list(def_records)
     flush(def_list, data_records)
-    {:noreply, {def_records, data_records}}
+    {:noreply, {%{}, %{}}}
   end
 
   # call
@@ -72,21 +72,18 @@ defmodule Fit.RecordRegistry do
     {:reply, Map.fetch(def_records, id), {def_records, data_records}}
   end
 
-  def handle_call({:get_data, id}, _from, {def_records, data_records}) do
-    {:reply, Map.fetch(data_records, id), {def_records, data_records}}
-  end
+  # def handle_call({:get_data, id}, _from, {def_records, data_records}) do
+  #   {:reply, Map.fetch(data_records, id), {def_records, data_records}}
+  # end
 
   #
   # Private
   #
 
-  defp flush([], _data_records) do
-    :ok
-  end
-
-  defp flush([{local_type, def_record}|tail], data_records) do
-    {data, data_records} = Map.pop(data_records, local_type)
-    Fit.Message.process(local_type, def_record, data)
-    flush(tail, data_records)
+  defp flush(def_records, data_records) do
+    Enum.each(def_records, fn {local_type, _def_record} ->
+      data = Map.get(data_records, local_type)
+      Fit.Message.process(data)
+    end)
   end
 end
