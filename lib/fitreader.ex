@@ -16,12 +16,11 @@ defmodule Fit do
     {:ok, fit} = File.read('test/2016-04-09-13-19-18.fit')
     {_header, rest} = Fit.Header.parse fit # 14:14
     read_record(rest)
+    Fit.RecordRegistry.flush
+    Map.keys(Fit.Message.get_all)
   end
 
-  def read_record(<<>>) do
-    Fit.RecordRegistry.flush
-    # :ok
-  end
+  def read_record(<<>>), do: :ok
   def read_record(data) do
     {recordheader, rest} = Fit.RecordHeader.parse data
     case recordheader.header_type do
@@ -33,7 +32,7 @@ defmodule Fit do
         {data_record, rest} = Fit.DataRecord.parse(def_record, rest)
         Fit.RecordRegistry.add_datarecord(recordheader.local_message_type, data_record)
       :timestamp ->
-        IO.puts "timestamp"
+        :timestamp
     end
     read_record(rest)
   end

@@ -11,8 +11,15 @@ defmodule Fit.Message do
     GenServer.cast(:messages, {:process, data})
   end
 
+  def flush(data_records) do
+    GenServer.call(:messages, {:process_all, data_records})
+  end
+
   def get(global_num) do
     GenServer.call(:messages, {:get, global_num})
+  end
+  def get_all do
+    GenServer.call(:messages, :get_all)
   end
 
   ## Callbacks
@@ -22,10 +29,19 @@ defmodule Fit.Message do
   end
 
   def handle_cast({:process, data_records}, state) do
-    [%{global_num: g_num}|_records] = data_records
-    messages = make_messages(data_records, [])
-    new_state = Map.update(state, g_num, messages, fn val -> [messages | val] end)
+    {global_num, messages} = process_records(data_records)
+    new_state = Map.update(state, global_num, messages, fn val -> [messages | val] end)
     {:noreply, new_state}
+  end
+
+  def handle_call({:process_all, grouped_data_records}, _from, state) do
+    new_state = grouped_data_records
+              |> Enum.map(&Task.async(fn ->
+                   process_records(&1)
+                 end))
+              |> Enum.map(&Task.await/1)
+              |> Enum.reduce(state, &update_state/2)
+    {:reply, :ok, new_state}
   end
 
   def handle_call({:get, global_num}, _from, state) do
@@ -35,32 +51,56 @@ defmodule Fit.Message do
     end
   end
 
-  def make_messages([], state), do: state
-  def make_messages([%{global_num: g_num, fields: fields}|records], state) do
-    record = process_fields(g_num, fields, [])
-          |> process_manufacturer
-          |> process_sourcetype
-          |> process_event
-    make_messages(records, [record|state])
+  def handle_call(:get_all, _from, state) do
+    {:reply, state, state}
   end
 
   ## Private
 
-  defp process_fields(_, [], state), do: state
-  defp process_fields(global_num, [{field_num, field_val}|fields], state) do
-    new_state = case Fit.Sdk.Fields.get(global_num, field_num) do
-      nil ->
-        state
-      {name, type, scale, offset} ->
-        val = field_val |> process_type(type)
-                        |> process_scale(scale)
-                        |> process_offset(offset)
-        [{name, val}|state]
-    end
-    process_fields(global_num, fields, new_state)
+  defp update_state({global_num, records}, state) do
+    Map.update(state, global_num, records, fn val -> val ++ records end)
   end
 
-  defp process_type([], _type), do: []
+  defp process_records(records) do
+    [%{global_num: global_num}|_records] = records
+    res = records
+            |> Enum.map(&Task.async(fn ->
+                 process_record(&1)
+               end))
+            |> Enum.map(&Task.await/1)
+    {global_num, res}
+  end
+
+  defp process_record(%{global_num: global_num, fields: fields}) do
+    process_fields(fields, global_num)
+    |> process_manufacturer
+    |> process_sourcetype
+    |> process_event
+    |> Enum.filter(fn x -> x != nil end)
+  end
+
+  defp process_fields(fields, global_num) do
+    fields
+    |> Enum.map(&Task.async(fn ->
+         process_field(&1, global_num)
+       end))
+    |> Enum.map(&Task.await/1)
+  end
+
+  defp process_field({field_num, field_val}, global_num) do
+    case Fit.Sdk.Fields.get(global_num, field_num) do
+      {name, type, scale, offset} ->
+        val = field_val
+              |> process_type(type)
+              |> process_scale(scale)
+              |> process_offset(offset)
+              |> process_list
+        {name, val}
+      nil ->
+        nil
+    end
+  end
+
   defp process_type([val|rest], type) do
     case Atom.to_string(type) do
       "enum" <> _rest ->
@@ -91,6 +131,13 @@ defmodule Fit.Message do
       Enum.map(val, fn v -> v - offset end)
     else
       val
+    end
+  end
+
+  defp process_list(val) do
+    case val do
+      [v|[]] -> v
+      _ -> val
     end
   end
 

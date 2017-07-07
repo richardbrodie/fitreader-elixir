@@ -15,16 +15,14 @@ defmodule Fit.RecordRegistry do
   def add_datarecord(local_type, data) do
     GenServer.cast(:records, {:add_datarecord, local_type, data})
   end
+
   def flush do
-    GenServer.cast(:records, :flush)
+    GenServer.call(:records, :flush)
   end
 
   def get_definition(id) do
     GenServer.call(:records, {:get_def, id})
   end
-  # def get_datarecords(id) do
-  #   GenServer.call(:records, {:get_data, id})
-  # end
 
   #
   # Callbacks
@@ -60,30 +58,13 @@ defmodule Fit.RecordRegistry do
     {:noreply, {def_records, data_records}}
   end
 
-  def handle_cast(:flush, {def_records, data_records}) do
-    def_list = Map.to_list(def_records)
-    flush(def_list, data_records)
-    {:noreply, {%{}, %{}}}
+  def handle_call(:flush, _from, {_def_records, data_records}) do
+    {:reply, Fit.Message.flush(Map.values(data_records)), {%{},%{}}}
   end
 
   # call
 
   def handle_call({:get_def, id}, _from, {def_records, data_records}) do
     {:reply, Map.fetch(def_records, id), {def_records, data_records}}
-  end
-
-  # def handle_call({:get_data, id}, _from, {def_records, data_records}) do
-  #   {:reply, Map.fetch(data_records, id), {def_records, data_records}}
-  # end
-
-  #
-  # Private
-  #
-
-  defp flush(def_records, data_records) do
-    Enum.each(def_records, fn {local_type, _def_record} ->
-      data = Map.get(data_records, local_type)
-      Fit.Message.process(data)
-    end)
   end
 end

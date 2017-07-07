@@ -8,7 +8,6 @@ defmodule Fit.DataRecord do
   def parse_fields([], _, fields, data), do: {fields, data}
   def parse_fields(field_defs, endian, fields, data) do
     [%{base_num: base_num, field_def_num: field_def_num, size: size} | tail] = field_defs
-    # {value, rest} = parse_data(base_num, endian, size, data, [])
     case parse_data(base_num, endian, size, data, []) do
       {[], rest} ->
         parse_fields(tail, endian, fields, rest)
