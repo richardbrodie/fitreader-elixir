@@ -1,19 +1,20 @@
 defmodule Fit.DataRecord do
   defstruct [:global_num, :fields]
-  def parse(%{endian: endian, global_msg: global, field_defs: fields}, data) do
-    {fields, rest} = parse_fields(fields, endian, [], data)
+  def parse(%{endian: endian, global_msg: global, field_defs: field_defs}, data) do
+    {fields, rest} = parse_fields(field_defs, endian, [], data)
     {%Fit.DataRecord{global_num: global, fields: fields}, rest}
   end
 
   def parse_fields([], _, fields, data), do: {fields, data}
+  def parse_fields(field_defs, _, fields, <<>>), do: {fields, <<>>}
   def parse_fields(field_defs, endian, fields, data) do
     [%{base_num: base_num, field_def_num: field_def_num, size: size} | tail] = field_defs
-    case parse_data(base_num, endian, size, data, []) do
-      {[], rest} ->
-        parse_fields(tail, endian, fields, rest)
-      {value, rest} ->
-        parse_fields(tail, endian, [{field_def_num, value}|fields], rest)
+    {result, rest} = parse_data(base_num, endian, size, data, [])
+    new_fields = case result do
+      [] -> fields
+      value -> [{field_def_num, value}|fields]
     end
+    parse_fields(tail, endian, new_fields, rest)
   end
 
   def parse_data(_, _, 0, data, value), do: {value, data}

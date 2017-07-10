@@ -2,26 +2,20 @@ defmodule Fit do
   @moduledoc """
   Documentation for Fit.
   """
-
-  @doc """
-  Hello world.
-  """
-  def hello do
-    :world
-  end
-
   def read do
     {:ok, _reg_pid} = Fit.RecordRegistry.start_link
     {:ok, _msg_pid} = Fit.Message.start_link
-    {:ok, fit} = File.read('test/2016-04-09-13-19-18.fit')
-    {_header, rest} = Fit.Header.parse fit # 14:14
-    read_record(rest)
+    # {:ok, fit} = File.read('test/2016-04-09-13-19-18.fit')
+    {:ok, fit} = File.read('test/1471568492.fit')
+    {header, rest} = Fit.Header.parse fit # 14:14
+    stop_at =  byte_size(fit) - (header[:num_record_bytes] + 14)
+    read_record(rest, stop_at)
     Fit.RecordRegistry.flush
     Map.keys(Fit.Message.get_all)
   end
 
-  def read_record(<<>>), do: :ok
-  def read_record(data) do
+  def read_record(<<>>, _), do: :ok
+  def read_record(data, stop_at) do
     {recordheader, rest} = Fit.RecordHeader.parse data
     case recordheader.header_type do
       :definition ->
@@ -34,6 +28,8 @@ defmodule Fit do
       :timestamp ->
         :timestamp
     end
-    read_record(rest)
+    unless byte_size(rest) == stop_at do
+      read_record(rest, stop_at)
+    end
   end
 end
