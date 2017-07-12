@@ -4,22 +4,22 @@ defmodule Fit.Message do
   ## Client API
 
   def start_link do
-    GenServer.start_link(__MODULE__, :ok, name: :messages)
+    GenServer.start_link(__MODULE__, :ok)
   end
 
-  def process(data) do
-    GenServer.cast(:messages, {:process, data})
+  def process(msg_pid, data) do
+    GenServer.cast(msg_pid, {:process, data})
   end
 
-  def flush(data_records) do
-    GenServer.call(:messages, {:process_all, data_records})
+  def flush(msg_pid, data_records) do
+    GenServer.call(msg_pid, {:process_all, data_records})
   end
 
-  def get(global_num) do
-    GenServer.call(:messages, {:get, global_num})
+  def get(msg_pid, global_num) do
+    GenServer.call(msg_pid, {:get, global_num})
   end
-  def get_all do
-    GenServer.call(:messages, :get_all)
+  def get_all(msg_pid) do
+    GenServer.call(msg_pid, :get_all)
   end
 
   ## Callbacks

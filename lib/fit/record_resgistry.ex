@@ -6,22 +6,26 @@ defmodule Fit.RecordRegistry do
   #
 
   def start_link do
-    GenServer.start_link(__MODULE__, :ok, name: :records)
+    GenServer.start_link(__MODULE__, :ok)
   end
 
-  def add_definition(local_type, def_record) do
-    GenServer.cast(:records, {:add_definition, local_type, def_record})
+  def add_definition(reg_pid, local_type, def_record) do
+    GenServer.cast(reg_pid, {:add_definition, local_type, def_record})
   end
-  def add_datarecord(local_type, data) do
-    GenServer.cast(:records, {:add_datarecord, local_type, data})
-  end
-
-  def flush do
-    GenServer.call(:records, :flush)
+  def add_datarecord(reg_pid, local_type, data) do
+    GenServer.cast(reg_pid, {:add_datarecord, local_type, data})
   end
 
-  def get_definition(id) do
-    GenServer.call(:records, {:get_def, id})
+  def flush(reg_pid) do
+    GenServer.call(reg_pid, :flush)
+  end
+
+  def get_definition(reg_pid, id) do
+    GenServer.call(reg_pid, {:get_def, id})
+  end
+
+  def stop(reg_pid) do
+    GenServer.stop(reg_pid)
   end
 
   #
@@ -31,40 +35,42 @@ defmodule Fit.RecordRegistry do
   # init
 
   def init(:ok) do
-    {:ok, {%{}, %{}}}
+    {:ok, msg_pid} = Fit.Message.start_link
+    {:ok, {%{}, %{}, msg_pid}}
   end
 
   # cast
 
-  def handle_cast({:add_definition, local_type, def_record}, {def_records, data_records}) do
+  def handle_cast({:add_definition, local_type, def_record}, {def_records, data_records, msg_pid}) do
     case Map.has_key?(def_records, local_type) do
       true ->
         {_old_def, def_records} = Map.get_and_update(def_records, local_type, fn c -> {c, def_record} end)
         {data, data_records} = Map.pop(data_records, local_type)
-        Fit.Message.process(data)
+        Fit.Message.process(msg_pid, data)
       false ->
         def_records = Map.put(def_records, local_type, def_record)
     end
-    {:noreply, {def_records, data_records}}
+    {:noreply, {def_records, data_records, msg_pid}}
   end
 
-  def handle_cast({:add_datarecord, local_type, data}, {def_records, data_records}) do
+  def handle_cast({:add_datarecord, local_type, data}, {def_records, data_records, msg_pid}) do
     case Map.has_key?(data_records, local_type) do
       true ->
         data_records = Map.update(data_records, local_type, [data], fn d -> [data | d] end)
       false ->
         data_records = Map.put(data_records, local_type, [data])
     end
-    {:noreply, {def_records, data_records}}
+    {:noreply, {def_records, data_records, msg_pid}}
   end
 
-  def handle_call(:flush, _from, {_def_records, data_records}) do
-    {:reply, Fit.Message.flush(Map.values(data_records)), {%{},%{}}}
+  def handle_call(:flush, _from, {_def_records, data_records, msg_pid}) do
+    Fit.Message.flush(msg_pid, Map.values(data_records))
+    {:reply, msg_pid, nil}
   end
 
   # call
 
-  def handle_call({:get_def, id}, _from, {def_records, data_records}) do
-    {:reply, Map.fetch(def_records, id), {def_records, data_records}}
+  def handle_call({:get_def, id}, _from, {def_records, data_records, msg_pid}) do
+    {:reply, Map.fetch(def_records, id), {def_records, data_records, msg_pid}}
   end
 end

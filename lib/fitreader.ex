@@ -3,33 +3,33 @@ defmodule Fit do
   Documentation for Fit.
   """
   def read do
-    {:ok, _reg_pid} = Fit.RecordRegistry.start_link
-    {:ok, _msg_pid} = Fit.Message.start_link
+    {:ok, reg_pid} = Fit.RecordRegistry.start_link
     # {:ok, fit} = File.read('test/2016-04-09-13-19-18.fit')
     {:ok, fit} = File.read('test/1471568492.fit')
     {header, rest} = Fit.Header.parse fit # 14:14
     stop_at =  byte_size(fit) - (header[:num_record_bytes] + 14)
-    read_record(rest, stop_at)
-    Fit.RecordRegistry.flush
-    Map.keys(Fit.Message.get_all)
+    read_record(rest, stop_at, reg_pid)
+    msg_pid = Fit.RecordRegistry.flush(reg_pid)
+    :ok = Fit.RecordRegistry.stop(reg_pid)
+    msg_pid
   end
 
-  def read_record(<<>>, _), do: :ok
-  def read_record(data, stop_at) do
+  def read_record(<<>>, _stop_at, _reg_pid), do: :ok
+  def read_record(data, stop_at, reg_pid) do
     {recordheader, rest} = Fit.RecordHeader.parse data
     case recordheader.header_type do
       :definition ->
         {def_record, rest} = Fit.DefinitionRecord.parse rest
-        Fit.RecordRegistry.add_definition(recordheader.local_message_type, def_record)
+        Fit.RecordRegistry.add_definition(reg_pid, recordheader.local_message_type, def_record)
       :data ->
-        {:ok, def_record} = Fit.RecordRegistry.get_definition(recordheader.local_message_type)
+        {:ok, def_record} = Fit.RecordRegistry.get_definition(reg_pid, recordheader.local_message_type)
         {data_record, rest} = Fit.DataRecord.parse(def_record, rest)
-        Fit.RecordRegistry.add_datarecord(recordheader.local_message_type, data_record)
+        Fit.RecordRegistry.add_datarecord(reg_pid, recordheader.local_message_type, data_record)
       :timestamp ->
         :timestamp
     end
     unless byte_size(rest) == stop_at do
-      read_record(rest, stop_at)
+      read_record(rest, stop_at, reg_pid)
     end
   end
 end
