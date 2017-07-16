@@ -13,8 +13,8 @@ defmodule Fit do
     msg_pid
   end
 
-  def read_record(<<>>, _stop_at, _reg_pid), do: :ok
-  def read_record(data, stop_at, reg_pid) do
+  defp read_record(<<>>, _stop_at, _reg_pid), do: :ok
+  defp read_record(data, stop_at, reg_pid) do
     {recordheader, rest} = Fit.RecordHeader.parse data
     case recordheader.header_type do
       :definition ->

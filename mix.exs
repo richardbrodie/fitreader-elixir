@@ -46,6 +46,6 @@ defmodule Fit.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    []
+    [{:ex_doc, "~> 0.16.2", only: :dev}]
   end
 end
