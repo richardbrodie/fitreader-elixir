@@ -2,11 +2,10 @@ defmodule Fit do
   @moduledoc """
   Documentation for Fit.
   """
-  def read do
+  def read(path) do
+    {:ok, fit} = File.read(path)
     {:ok, reg_pid} = Fit.RecordRegistry.start_link
-    # {:ok, fit} = File.read('test/2016-04-09-13-19-18.fit')
-    {:ok, fit} = File.read('test/1471568492.fit')
-    {header, rest} = Fit.Header.parse fit # 14:14
+    {header, rest} = Fit.Header.parse fit
     stop_at =  byte_size(fit) - (header[:num_record_bytes] + 14)
     read_record(rest, stop_at, reg_pid)
     msg_pid = Fit.RecordRegistry.flush(reg_pid)
