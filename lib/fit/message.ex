@@ -18,8 +18,13 @@ defmodule Fit.Message do
   def get(msg_pid, global_num) do
     GenServer.call(msg_pid, {:get, global_num})
   end
+
   def get_all(msg_pid) do
     GenServer.call(msg_pid, :get_all)
+  end
+
+  def get_keys(msg_pid) do
+    GenServer.call(msg_pid, :get_keys)
   end
 
   ## Callbacks
@@ -46,7 +51,10 @@ defmodule Fit.Message do
 
   def handle_call({:get, global_num}, _from, state) do
     case Map.fetch(state, global_num) do
-      {:ok, result} -> {:reply, result, state}
+      {:ok, [result|[]]} -> {:reply, to_map(result), state}
+      {:ok, [head|tail]} ->
+        result = [head|tail] |> Enum.map(&to_map(&1))
+        {:reply, result, state}
       :error -> {:reply, :error, state}
     end
   end
@@ -55,7 +63,15 @@ defmodule Fit.Message do
     {:reply, state, state}
   end
 
+  def handle_call(:get_keys, _from, state) do
+    {:reply, Map.keys(state), state}
+  end
+
   ## Private
+
+  defp to_map(record) do
+    record |> Enum.reduce(%{}, fn {k,v}, acc -> Map.put(acc, k, v) end)
+  end
 
   defp update_state({global_num, records}, state) do
     Map.update(state, global_num, records, fn val -> val ++ records end)

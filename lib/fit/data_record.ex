@@ -6,7 +6,7 @@ defmodule Fit.DataRecord do
   end
 
   def parse_fields([], _, fields, data), do: {fields, data}
-  def parse_fields(field_defs, _, fields, <<>>), do: {fields, <<>>}
+  def parse_fields(_, _, fields, <<>>), do: {fields, <<>>}
   def parse_fields(field_defs, endian, fields, data) do
     [%{base_num: base_num, field_def_num: field_def_num, size: size} | tail] = field_defs
     {result, rest} = parse_data(base_num, endian, size, data, [])
@@ -71,19 +71,23 @@ defmodule Fit.DataRecord do
     parse_data(6, endian, size-4, rest, validate_field(field, invalid, value))
   end
   def parse_data(7, endian, size, data, value) do
-    <<raw::binary-size(size), rest::binary>> = data
-    field = Enum.filter(String.to_charlist(raw), fn x -> x > 0 end)
+    <<field::binary-size(size), rest::binary>> = data
     parse_data(7, endian, 0, rest, [field|value])
   end
   def parse_data(8, endian, size, data, value) do
     invalid = 4294967295
-    case endian do
-      :little ->
-        <<field::little-float-size(32), rest::binary>> = data
-      :big ->
-        <<field::float-size(32), rest::binary>> = data
+    case valid?(data, invalid, size) do
+      {:ok, data} ->
+        case endian do
+          :little ->
+            <<field::signed-little-float-size(32), rest::binary>> = data
+          :big ->
+            <<field::signed-float-size(32), rest::binary>> = data
+        end
+        parse_data(8, endian, size-4, rest, validate_field(field, invalid, value))
+      {:error, rest} ->
+        parse_data(8, endian, size-4, rest, value)
     end
-    parse_data(8, endian, size-4, rest, validate_field(field, invalid, value))
   end
   def parse_data(9, endian, size, data, value) do
     invalid = 18446744073709551615
@@ -154,7 +158,14 @@ defmodule Fit.DataRecord do
     parse_data(16, endian, size-8, rest, validate_field(field, invalid, value))
   end
 
-  def validate_field(field, invalid, values) do
+  defp valid?(data, invalid, size) do
+    case data do
+      <<^invalid::unit(8)-size(size), rest::binary>> -> {:error, rest}
+      _ -> {:ok, data}
+    end
+  end
+
+  defp validate_field(field, invalid, values) do
     unless field == invalid do
       values = [field | values]
     end
