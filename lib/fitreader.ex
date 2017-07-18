@@ -3,14 +3,27 @@ defmodule Fit do
   Documentation for Fit.
   """
   def read(path) do
-    {:ok, fit} = File.read(path)
-    {:ok, reg_pid} = Fit.RecordRegistry.start_link
-    {header, rest} = Fit.Header.parse fit
-    stop_at =  byte_size(fit) - (header[:num_record_bytes] + 14)
-    read_record(rest, stop_at, reg_pid)
-    msg_pid = Fit.RecordRegistry.flush(reg_pid)
-    :ok = Fit.RecordRegistry.stop(reg_pid)
-    msg_pid
+    case File.read(path) do
+      {:ok, fit} ->
+        {:ok, reg_pid} = Fit.RecordRegistry.start_link
+        {header, rest} = Fit.Header.parse fit
+        stop_at =  byte_size(fit) - (header[:num_record_bytes] + 14)
+        read_record(rest, stop_at, reg_pid)
+        msg_pid = Fit.RecordRegistry.flush(reg_pid)
+        :ok = Fit.RecordRegistry.stop(reg_pid)
+        {:ok, msg_pid}
+      _ ->
+        {:error}
+    end
+  end
+
+  def digest(pid) do
+    Fit.Message.get_keys(pid)
+    |> Enum.reduce(%{}, fn k, acc -> Map.put(acc, k, Fit.Sdk.Messages.get(k)) end)
+  end
+
+  def record(pid, number) do
+    Fit.Message.get(pid, number)
   end
 
   defp read_record(<<>>, _stop_at, _reg_pid), do: :ok
