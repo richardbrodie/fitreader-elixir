@@ -1,12 +1,18 @@
 defmodule Fit.DataRecord do
   defstruct [:global_num, :fields]
-  def parse(%{endian: endian, global_msg: global, field_defs: field_defs}, data) do
+  def parse(record_def, data) do
+    %{endian: endian, global_msg: global, field_defs: field_defs} = record_def
     {fields, rest} = parse_fields(field_defs, endian, [], data)
-    {%Fit.DataRecord{global_num: global, fields: fields}, rest}
+    record = %Fit.DataRecord{global_num: global, fields: fields}
+    if Map.has_key?(record_def, :dev_field_defs) do
+      %{dev_field_defs: dev_field_defs} = record_def
+      {dev_fields, rest} = parse_dev_fields(dev_field_defs, endian, [], rest)
+      record = Map.put(record, :dev_fields, dev_fields)
+    end
+    {record, rest}
   end
 
-  def parse_fields([], _, fields, data), do: {fields, data}
-  def parse_fields(_, _, fields, <<>>), do: {fields, <<>>}
+  def parse_fields([], _endian, fields, data), do: {fields, data}
   def parse_fields(field_defs, endian, fields, data) do
     [%{base_num: base_num, field_def_num: field_def_num, size: size} | tail] = field_defs
     {result, rest} = parse_data(base_num, endian, size, data, [])
@@ -15,6 +21,18 @@ defmodule Fit.DataRecord do
       value -> [{field_def_num, value}|fields]
     end
     parse_fields(tail, endian, new_fields, rest)
+  end
+
+  def parse_dev_fields([], _endian, fields, data), do: {fields, data}
+  def parse_dev_fields(field_defs, endian, fields, data) do
+    [%{developer_data_index: _developer_data_index, field_num: _field_num, size: size, field_def: field_def} | new_field_defs] = field_defs
+    %{base_type_id: base_type_id, field_def_num: _field_def_num, field_name: field_name, units: _units} = field_def
+    {result, rest} = parse_data(base_type_id, endian, size, data, [])
+    new_fields = case result do
+      [] -> fields
+      value -> [{field_name, value}|fields]
+    end
+    parse_dev_fields(new_field_defs, endian, new_fields, rest)
   end
 
   def parse_data(_, _, 0, data, value), do: {value, data}
@@ -71,7 +89,8 @@ defmodule Fit.DataRecord do
     parse_data(6, endian, size-4, rest, validate_field(field, invalid, value))
   end
   def parse_data(7, endian, size, data, value) do
-    <<field::binary-size(size), rest::binary>> = data
+    <<raw::binary-size(size), rest::binary>> = data
+    [field, _] = :binary.split(raw,<<0>>)
     parse_data(7, endian, 0, rest, [field|value])
   end
   def parse_data(8, endian, size, data, value) do

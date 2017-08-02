@@ -10,7 +10,7 @@ defmodule FitTest do
   end
 
   test "read working wahoo files" do
-    path = "test/files/working/2017-05-10-060659-ELEMNT BOLT FE0B-2-0.fit"
+    path = "test/files/wahoo/2017-05-10-060659-ELEMNT BOLT FE0B-2-0.fit"
     [path]
     |> Enum.each(fn p ->
       IO.puts p
@@ -26,7 +26,9 @@ defmodule FitTest do
     |> Enum.each(fn p ->
       IO.puts p
       {:ok, pid} = Fit.read(p)
-      Fit.record(pid, 20)
+      r = Fit.record(pid, 20)
+      # r = Fit.record(pid, 23)
+      IO.inspect r
     end)
   end
 
@@ -39,22 +41,12 @@ defmodule FitTest do
     end)
   end
 
-  test "read all unclear files" do
-    Path.wildcard("test/files/*.fit")
+  test "read all wahoo files" do
+    Path.wildcard("test/files/wahoo/*.fit")
     |> Enum.each(fn p ->
       IO.puts p
       {:ok, pid} = Fit.read(p)
       Fit.record(pid, 20)
     end)
   end
-
-  # test "read all not_working files" do
-  #   Path.wildcard("test/files/not_working/*.fit")
-  #   |> Enum.each(fn p -> Fit.read(p) end)
-  # end
-  #
-  # test "read all unknown files" do
-  #   Path.wildcard("test/files/*.fit")
-  #   |> Enum.each(fn p -> Fit.read(p) end)
-  # end
 end
