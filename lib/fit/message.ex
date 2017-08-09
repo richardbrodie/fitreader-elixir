@@ -1,3 +1,5 @@
+require IEx;
+
 defmodule Fit.Message do
   use GenServer
 
@@ -7,12 +9,15 @@ defmodule Fit.Message do
     GenServer.start_link(__MODULE__, :ok)
   end
 
-  def process(msg_pid, data) do
-    GenServer.cast(msg_pid, {:process, data})
+  def queue(msg_pid, record) do
+    GenServer.cast(msg_pid, {:queue, record})
   end
 
-  def flush(msg_pid, data_records) do
-    GenServer.call(msg_pid, {:process_all, data_records})
+  # def process(msg_pid, data) do
+  #   GenServer.call(msg_pid, {:process, data})
+  # end
+  def process(msg_pid) do
+    GenServer.call(msg_pid, :process)
   end
 
   def get(msg_pid, global_num) do
@@ -30,41 +35,46 @@ defmodule Fit.Message do
   ## Callbacks
 
   def init(:ok) do
-    {:ok, %{}}
+    {:ok, {%{}, %{}}}
   end
 
-  def handle_cast({:process, data_records}, state) do
-    {global_num, messages} = process_records(data_records)
-    new_state = Map.update(state, global_num, messages, fn val -> [messages | val] end)
-    {:noreply, new_state}
+  def handle_cast({:queue, {global_num, data_record}}, {queue, records}) do
+    new_queue = Map.update(queue, global_num, [data_record], fn val -> [data_record | val] end)
+    {:noreply, {new_queue, records}}
   end
 
-  def handle_call({:process_all, grouped_data_records}, _from, state) do
-    new_state = grouped_data_records
-              |> Enum.map(&Task.async(fn ->
-                   process_records(&1)
-                 end))
-              |> Enum.map(&Task.await/1)
-              |> Enum.reduce(state, &update_state/2)
-    {:reply, :ok, new_state}
+  def handle_call(:process, _from, {queue, records}) do
+    records = queue |> Map.to_list
+                    |> Enum.map(&process_records/1)
+                    |> Enum.into(%{})
+            # |> Enum.map(&Task.async(fn ->
+            #      process_records(&1)
+            #    end))
+            # |> Enum.map(&Task.await/1)
+    {:reply, :ok, {queue, records}}
   end
+  # def handle_call({:process, {global_num, data_record}}, _from, {queue, records}) do
+  #   record = process_record(global_num, data_record)
+  #   new_records = Map.update(records, global_num, [record], fn val -> [record | val] end)
+  #   {:reply, :ok, {queue, new_records}}
+  # end
 
-  def handle_call({:get, global_num}, _from, state) do
-    case Map.fetch(state, global_num) do
-      {:ok, [result|[]]} -> {:reply, to_map(result), state}
-      {:ok, [head|tail]} ->
-        result = [head|tail] |> Enum.map(&to_map(&1))
-        {:reply, result, state}
-      :error -> {:reply, :error, state}
+  def handle_call({:get, global_num}, _from, {queue, records}) do
+    case Map.fetch(records, global_num) do
+      {:ok, [result|[]]} -> {:reply, to_map(result), {queue, records}}
+      {:ok, other} ->
+        result = other |> Enum.reverse |> Enum.map(&to_map(&1))
+        {:reply, result, {queue, records}}
+      :error -> {:reply, :error, {queue, records}}
     end
   end
 
-  def handle_call(:get_all, _from, state) do
-    {:reply, state, state}
+  def handle_call(:get_all, _from, {queue, records}) do
+    {:reply, records, {queue, records}}
   end
 
-  def handle_call(:get_keys, _from, state) do
-    {:reply, Map.keys(state), state}
+  def handle_call(:get_keys, _from, {queue, records}) do
+    {:reply, Map.keys(records), {queue, records}}
   end
 
   ## Private
@@ -73,34 +83,35 @@ defmodule Fit.Message do
     record |> Enum.reduce(%{}, fn {k,v}, acc -> Map.put(acc, k, v) end)
   end
 
-  defp update_state({global_num, records}, state) do
-    Map.update(state, global_num, records, fn val -> val ++ records end)
-  end
-
-  defp process_records(records) do
-    [%{global_num: global_num}|_records] = records
-    res = records
-            |> Enum.map(&Task.async(fn ->
-                 process_record(&1)
-               end))
-            |> Enum.map(&Task.await/1)
+  defp process_records({global_num, records}) do
+    res = records |> Enum.map(&Task.async(fn ->
+                       process_record(global_num, &1)
+                     end))
+                  |> Enum.map(&Task.await/1)
+    # res = records |> Enum.map(&process_record(global_num, &1))
     {global_num, res}
   end
 
-  defp process_record(%{global_num: global_num, fields: fields}) do
-    process_fields(fields, global_num)
-    |> process_manufacturer
-    |> process_sourcetype
-    |> process_event
-    |> Enum.filter(fn x -> x != nil end)
-  end
+  defp process_record(global_num, data) do
+    %{fields: fields} = data
+    record = fields
+              |> Enum.map(fn f -> process_field(f, global_num) end)
+              |> process_manufacturer
+              |> process_sourcetype
+              |> process_event
+              |> Enum.filter(fn x -> x != nil end)
 
-  defp process_fields(fields, global_num) do
-    fields
-    |> Enum.map(&Task.async(fn ->
-         process_field(&1, global_num)
-       end))
-    |> Enum.map(&Task.await/1)
+    case data do
+      %{dev_fields: dev_fields} ->
+        Enum.map(dev_fields, fn {k,v} -> {k, process_list(v)} end) |> Enum.concat(record)
+      _ -> record
+    end
+    # case Map.has_key?(data, :dev_fields) do
+    #   true ->
+    #     %{dev_fields: dev_fields} = data
+    #     Enum.map(dev_fields, fn {k,v} -> {k, process_list(v)} end) |> Enum.concat(record)
+    #   false -> record
+    # end
   end
 
   defp process_field({field_num, field_val}, global_num) do
@@ -113,7 +124,8 @@ defmodule Fit.Message do
               |> process_list
         {name, val}
       nil ->
-        nil
+        val = field_val |> process_list
+        {field_num, val}
     end
   end
 

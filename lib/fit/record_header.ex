@@ -8,13 +8,13 @@ defmodule Fit.RecordHeader do
          local_message_type     ::4 >> ->
            {%{header_type: (if message_type == 1, do: :definition, else: :data),
              message_type_specific: message_type_specific,
-             local_message_type: local_message_type},rest}
+             local_message_type: local_message_type}, rest}
        << 1                      ::1,
           local_message_type     ::2,
           time_offset            ::5 >> ->
             {%{header_type: :timestamp,
               local_message_type: local_message_type,
-              time_offset: time_offset},rest}
+              time_offset: time_offset}, rest}
     end
   end
 end
