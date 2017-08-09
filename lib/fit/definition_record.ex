@@ -25,7 +25,7 @@ defmodule Fit.DefinitionRecord do
     {definition, rest}
   end
 
-  def parse_field_def(rest, 0, fields), do: {fields, rest}
+  def parse_field_def(rest, 0, fields), do: {Enum.reverse(fields), rest}
   def parse_field_def(data, num_fields, fields) when num_fields > 0 do
     <<
       field_def_num,
@@ -41,10 +41,10 @@ defmodule Fit.DefinitionRecord do
           endianness: endianness,
           base_num: base_num
         }
-    parse_field_def(rest, num_fields-1, fields ++ [f])
+    parse_field_def(rest, num_fields-1, [f | fields])
   end
 
-  def parse_dev_field_defs(rest, _dev_pid, 0, dev_fields), do: {dev_fields, rest}
+  def parse_dev_field_defs(rest, _dev_pid, 0, dev_fields), do: {Enum.reverse(dev_fields), rest}
   def parse_dev_field_defs(data, dev_pid, num_fields, dev_fields) do
     <<
       field_num,
@@ -59,6 +59,6 @@ defmodule Fit.DefinitionRecord do
           developer_data_index: developer_data_index,
           field_def: field_def
         }
-    parse_dev_field_defs(rest, dev_pid, num_fields-1, dev_fields ++ [f])
+    parse_dev_field_defs(rest, dev_pid, num_fields-1, [f | dev_fields])
   end
 end

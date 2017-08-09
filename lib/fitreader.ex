@@ -15,6 +15,7 @@ defmodule Fit do
 
         Agent.stop(reg_pid)
         Agent.stop(dev_pid)
+        :ok = Fit.Message.process(msg_pid)
         {:ok, msg_pid}
       _ ->
         {:error}
@@ -64,7 +65,8 @@ defmodule Fit do
       dev_field = make_developer_field(data_record.fields, Map.new)
       Agent.update(dev_pid, &Map.put(&1, dev_field.dev_data_idx, dev_field))
     else
-      Fit.Message.process(msg_pid, {def_record.global_msg, data_record})
+      Fit.Message.queue(msg_pid, {def_record.global_msg, data_record})
+      # Fit.Message.process(msg_pid, {def_record.global_msg, data_record})
     end
     rest
   end
