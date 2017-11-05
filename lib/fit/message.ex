@@ -13,9 +13,6 @@ defmodule Fit.Message do
     GenServer.cast(msg_pid, {:queue, record})
   end
 
-  # def process(msg_pid, data) do
-  #   GenServer.call(msg_pid, {:process, data})
-  # end
   def process(msg_pid) do
     GenServer.call(msg_pid, :process)
   end
@@ -43,21 +40,12 @@ defmodule Fit.Message do
     {:noreply, {new_queue, records}}
   end
 
-  def handle_call(:process, _from, {queue, records}) do
+  def handle_call(:process, _from, {queue, _records}) do
     records = queue |> Map.to_list
                     |> Enum.map(&process_records/1)
                     |> Enum.into(%{})
-            # |> Enum.map(&Task.async(fn ->
-            #      process_records(&1)
-            #    end))
-            # |> Enum.map(&Task.await/1)
     {:reply, :ok, {queue, records}}
   end
-  # def handle_call({:process, {global_num, data_record}}, _from, {queue, records}) do
-  #   record = process_record(global_num, data_record)
-  #   new_records = Map.update(records, global_num, [record], fn val -> [record | val] end)
-  #   {:reply, :ok, {queue, new_records}}
-  # end
 
   def handle_call({:get, global_num}, _from, {queue, records}) do
     case Map.fetch(records, global_num) do
@@ -84,11 +72,11 @@ defmodule Fit.Message do
   end
 
   defp process_records({global_num, records}) do
-    res = records |> Enum.map(&Task.async(fn ->
-                       process_record(global_num, &1)
-                     end))
-                  |> Enum.map(&Task.await/1)
-    # res = records |> Enum.map(&process_record(global_num, &1))
+    # res = records |> Enum.map(&Task.async(fn ->
+    #                    process_record(global_num, &1)
+    #                  end))
+    #               |> Enum.map(&Task.await/1)
+    res = records |> Enum.map(&process_record(global_num, &1))
     {global_num, res}
   end
 
@@ -101,17 +89,12 @@ defmodule Fit.Message do
               |> process_event
               |> Enum.filter(fn x -> x != nil end)
 
-    case data do
-      %{dev_fields: dev_fields} ->
+    case Map.has_key?(data, :dev_fields) do
+      true ->
+        %{dev_fields: dev_fields} = data
         Enum.map(dev_fields, fn {k,v} -> {k, process_list(v)} end) |> Enum.concat(record)
-      _ -> record
+      false -> record
     end
-    # case Map.has_key?(data, :dev_fields) do
-    #   true ->
-    #     %{dev_fields: dev_fields} = data
-    #     Enum.map(dev_fields, fn {k,v} -> {k, process_list(v)} end) |> Enum.concat(record)
-    #   false -> record
-    # end
   end
 
   defp process_field({field_num, field_val}, global_num) do
