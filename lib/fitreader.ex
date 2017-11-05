@@ -2,12 +2,18 @@ defmodule Fit do
   @moduledoc """
   Documentation for Fit.
   """
+
+  def read do
+    path = "test/files/not_working/2017-07-30-085002-ELEMNT BOLT FE0B-12-0.fit"
+    read(path)
+  end
+
   def read(path) do
     case File.read(path) do
       {:ok, fit} ->
         {:ok, msg_pid} = Fit.Message.start_link
-        {:ok, reg_pid} = Agent.start_link(fn -> Map.new end)
-        {:ok, dev_pid} = Agent.start_link(fn -> Map.new end)
+        {:ok, reg_pid} = Agent.start_link(fn -> %{} end)
+        {:ok, dev_pid} = Agent.start_link(fn -> %{} end)
 
         {header, rest} = Fit.Header.parse fit
         stop_at = byte_size(fit) - (header[:num_record_bytes] + 14)
@@ -31,14 +37,9 @@ defmodule Fit do
     Fit.Message.get(pid, number)
   end
 
-  def digest(pid) do
-    Fit.Message.get_keys(pid)
-    |> Enum.reduce(%{}, fn k, acc -> Map.put(acc, k, Fit.Sdk.Messages.get(k)) end)
-  end
-
-  def record(pid, number) do
-    Fit.Message.get(pid, number)
-  end
+  #
+  # private
+  #
 
   defp read_records(<<>>, _stop_at, _pids), do: :ok
   defp read_records(data, stop_at, {msg_pid, reg_pid, dev_pid}) do
@@ -71,11 +72,10 @@ defmodule Fit do
 
     # if record is a dev_field definition store it seperately
     if def_record.global_msg == 206 do
-      dev_field = make_developer_field(data_record.fields, Map.new)
+      dev_field = make_developer_field(data_record.fields, %{})
       Agent.update(dev_pid, &Map.put(&1, dev_field.dev_data_idx, dev_field))
     else
       Fit.Message.queue(msg_pid, {def_record.global_msg, data_record})
-      # Fit.Message.process(msg_pid, {def_record.global_msg, data_record})
     end
     rest
   end
@@ -84,11 +84,16 @@ defmodule Fit do
   defp make_developer_field(data_record, map) do
     [entry | tail] = data_record
     new_map = case entry do
-      {0, [val]} -> Map.put(map, :dev_data_idx, val)
-      {1, [val]} -> Map.put(map, :field_def_num, val)
-      {2, [val]} -> Map.put(map, :base_type_id, val)
-      {3, [val]} -> Map.put(map, :field_name, val)
-      {8, [val]} -> Map.put(map, :units, val)
+      {0, val} -> Map.put(map, :dev_data_idx, val)
+      {1, val} -> Map.put(map, :field_def_num, val)
+      {2, val} -> Map.put(map, :base_type_id, val)
+      {3, val} -> Map.put(map, :field_name, val)
+      {8, val} -> Map.put(map, :units, val)
+      # {0, [val]} -> Map.put(map, :dev_data_idx, val)
+      # {1, [val]} -> Map.put(map, :field_def_num, val)
+      # {2, [val]} -> Map.put(map, :base_type_id, val)
+      # {3, [val]} -> Map.put(map, :field_name, val)
+      # {8, [val]} -> Map.put(map, :units, val)
       _ -> map
     end
     make_developer_field(tail, new_map)

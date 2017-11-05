@@ -5,6 +5,7 @@ defmodule Fit.Header do
               profile_version   ::little-16,
               num_record_bytes  ::little-32,
               ".FIT",
+              # _                 ::little-32,
               crc               ::little-16,
               rest             ::binary >>) do
     {%{

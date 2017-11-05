@@ -1,32 +1,38 @@
 defmodule Fit.DefinitionRecord do
-  defstruct [:endian, :global_msg, :num_fields, :field_defs]
-  def parse(<< def_record::binary-size(5), rest::binary >>, has_developer_fields, dev_pid) do
-    meta = case def_record do
+  defstruct [:endian, :global_msg, :num_fields, :field_defs, :dev_field_defs]
+  def parse(<< def_record::binary-size(5), rest::binary >>, 1, dev_pid) do
+    meta = parse_record(def_record)
+    {fields, rest} = parse_field_defs(rest, meta.num_fields, [])
+    definition = Map.put(meta, :field_defs, fields)
+    <<num_fields::little-8, rest::binary>> = rest
+    {dev_fields, rest} = parse_dev_field_defs(rest, dev_pid, num_fields, [])
+    definition = Map.put(definition, :dev_field_defs, dev_fields)
+    {definition, rest}
+  end
+  def parse(<< def_record::binary-size(5), rest::binary >>, _, _) do
+    meta = parse_record(def_record)
+    {fields, rest} = parse_field_defs(rest, meta.num_fields, [])
+    definition = Map.put(meta, :field_defs, fields)
+    {definition, rest}
+  end
+
+  defp parse_record(data) do
+    case data do
       << _reserved     ::little-8,
          0             ::little-8,
          global_msg    ::little-16,
          num_fields    ::little-8
-      >> ->
-        %{endian: :little, global_msg: global_msg, num_fields: num_fields}
+      >> -> %Fit.DefinitionRecord{endian: :little, global_msg: global_msg, num_fields: num_fields}
       << _reserved     ::little-8,
          1             ::little-8,
          global_msg    ::big-16,
          num_fields    ::little-8
-      >> ->
-        %{endian: :big, global_msg: global_msg, num_fields: num_fields}
+      >> -> %Fit.DefinitionRecord{endian: :big, global_msg: global_msg, num_fields: num_fields}
     end
-    {fields, rest} = parse_field_def(rest, meta.num_fields, [])
-    definition = Map.put(meta, :field_defs, fields)
-    if has_developer_fields == 1 do
-      <<num_fields::little-8, rest::binary>> = rest
-      {dev_fields, rest} = parse_dev_field_defs(rest, dev_pid, num_fields, [])
-      definition = Map.put(definition, :dev_field_defs, dev_fields)
-    end
-    {definition, rest}
   end
 
-  def parse_field_def(rest, 0, fields), do: {Enum.reverse(fields), rest}
-  def parse_field_def(data, num_fields, fields) when num_fields > 0 do
+  defp parse_field_defs(rest, 0, fields), do: {Enum.reverse(fields), rest}
+  defp parse_field_defs(data, num_fields, fields) when num_fields > 0 do
     <<
       field_def_num,
       size,
@@ -41,7 +47,7 @@ defmodule Fit.DefinitionRecord do
           endianness: endianness,
           base_num: base_num
         }
-    parse_field_def(rest, num_fields-1, [f | fields])
+    parse_field_defs(rest, num_fields-1, [f | fields])
   end
 
   def parse_dev_field_defs(rest, _dev_pid, 0, dev_fields), do: {Enum.reverse(dev_fields), rest}

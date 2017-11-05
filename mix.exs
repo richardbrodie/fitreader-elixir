@@ -3,7 +3,7 @@ defmodule Fit.Mixfile do
 
   def project do
     [app: :fitreader,
-     version: "0.0.1",
+     version: "0.1.0",
      elixir: "~> 1.4",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
@@ -47,6 +47,7 @@ defmodule Fit.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [{:ex_doc, "~> 0.16.2", only: :dev},
+     {:flow, "~> 0.11"},
      {:benchee, "~> 0.9", only: :dev},
      {:exprof, "~> 0.2.0", only: :dev}]
   end

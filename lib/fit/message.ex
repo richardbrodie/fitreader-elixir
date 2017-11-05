@@ -42,16 +42,21 @@ defmodule Fit.Message do
 
   def handle_call(:process, _from, {queue, _records}) do
     records = queue |> Map.to_list
-                    |> Enum.map(&process_records/1)
+                    |> Enum.map(&process_records(&1))
                     |> Enum.into(%{})
     {:reply, :ok, {queue, records}}
   end
 
   def handle_call({:get, global_num}, _from, {queue, records}) do
-    case Map.fetch(records, global_num) do
-      {:ok, [result|[]]} -> {:reply, to_map(result), {queue, records}}
+    candidate = Map.fetch(records, global_num)
+    case candidate do
+      {:ok, [single_record|[]]} ->
+        result = single_record |> Enum.into(%{})
+        {:reply, result, {queue, records}}
       {:ok, other} ->
-        result = other |> Enum.reverse |> Enum.map(&to_map(&1))
+        result = other
+                 |> Enum.reverse
+                 |> Enum.map(&Enum.into(&1, %{}))
         {:reply, result, {queue, records}}
       :error -> {:reply, :error, {queue, records}}
     end
@@ -66,89 +71,71 @@ defmodule Fit.Message do
   end
 
   ## Private
-
-  defp to_map(record) do
-    record |> Enum.reduce(%{}, fn {k,v}, acc -> Map.put(acc, k, v) end)
-  end
-
   defp process_records({global_num, records}) do
-    # res = records |> Enum.map(&Task.async(fn ->
-    #                    process_record(global_num, &1)
-    #                  end))
-    #               |> Enum.map(&Task.await/1)
-    res = records |> Enum.map(&process_record(global_num, &1))
+    res = records
+          |> batch_process_records(global_num, [])
     {global_num, res}
   end
 
-  defp process_record(global_num, data) do
-    %{fields: fields} = data
+  defp batch_process_records([], _global, records), do: records
+  defp batch_process_records([%{fields: fields, dev_fields: dev_fields}|tail], global, records) do
     record = fields
-              |> Enum.map(fn f -> process_field(f, global_num) end)
-              |> process_manufacturer
-              |> process_sourcetype
-              |> process_event
-              |> Enum.filter(fn x -> x != nil end)
-
-    case Map.has_key?(data, :dev_fields) do
-      true ->
-        %{dev_fields: dev_fields} = data
-        Enum.map(dev_fields, fn {k,v} -> {k, process_list(v)} end) |> Enum.concat(record)
-      false -> record
+             |> process_fields(global, [])
+             |> process_manufacturer
+             |> process_sourcetype
+             |> process_event
+    record = case dev_fields do
+      nil -> record
+      _ -> dev_fields |> Enum.concat(record)
     end
+    batch_process_records(tail, global, [record|records])
   end
 
-  defp process_field({field_num, field_val}, global_num) do
-    case Fit.Sdk.Fields.get(global_num, field_num) do
+  defp process_fields([], _global_num, processed), do: processed
+  defp process_fields([{field_num, raw_val}|tail], global_num, processed) do
+    field = case Fit.Sdk.Fields.get(global_num, field_num) do
       {name, type, scale, offset} ->
-        val = field_val
-              |> process_type(type)
-              |> process_scale(scale)
-              |> process_offset(offset)
-              |> process_list
-        {name, val}
-      nil ->
-        val = field_val |> process_list
-        {field_num, val}
+        processed_val = raw_val
+                        |> process_type(type)
+                        |> process_scale(scale)
+                        |> process_offset(offset)
+        {name, processed_val}
+      _ ->
+        {field_num, raw_val}
     end
+    process_fields(tail, global_num, [field|processed])
   end
 
-  defp process_type([val|rest], type) do
-    case Atom.to_string(type) do
-      "enum" <> _rest ->
-        Fit.Sdk.Enums.get(type, val)
-      "date_time" ->
-        {:ok, t} = DateTime.from_unix(631065600 + val)
-        DateTime.to_string(t)
-      "local_date_time" ->
-        {:ok, t} = DateTime.from_unix(631058400 + val)
-        DateTime.to_string(t)
-      "coordinates" ->
+  defp process_type(val, type) do
+    case type do
+      {:enum, enum_name} ->
+        Fit.Sdk.Enums.get(enum_name, val)
+      :date_time ->
+        adjusted_unix = 631065600 + val
+      :local_date_time ->
+        adjusted_unix = 631065600 + val
+      :coordinates ->
         val * (180 / :math.pow(2,31))
       _ ->
-        [val|rest]
+        val
     end
   end
 
+  defp process_scale(val, 0), do: val
   defp process_scale(val, scale) do
-    if scale > 0 do
+    if is_list val do
       Enum.map(val, fn v -> (v * 1.0) / scale end)
     else
-      val
+      (val * 1.0) / scale
     end
   end
 
+  defp process_offset(val, 0), do: val
   defp process_offset(val, offset) do
-    if offset > 0 do
+    if is_list val do
       Enum.map(val, fn v -> v - offset end)
     else
-      val
-    end
-  end
-
-  defp process_list(val) do
-    case val do
-      [v|[]] -> v
-      _ -> val
+      val - offset
     end
   end
 

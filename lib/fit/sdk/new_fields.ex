@@ -1,4 +1,4 @@
-defmodule Fit.Sdk.Fields do
+defmodule Fit.Sdk.NewFields do
   @_msg_0 %{
     0 => {:filetype, {:enum, :enum_file}, 0, 0},
     1 => {:manufacturer, {:enum, :enum_manufacturer}, 0, 0},
@@ -8,7 +8,8 @@ defmodule Fit.Sdk.Fields do
     5 => {:number, :raw, 0, 0},
     8 => {:product_name, :raw, 0, 0}
   }
-  def get(0, key), do: @_msg_0[key]
+  def get(0, key), do: get_0(key)
+  def get_0(0), do: {:filetype, {:enum, :enum_file}, 0, 0}
 
   @_msg_3 %{
     254 => {:message_index, :message_index, 0, 0},
@@ -35,7 +36,10 @@ defmodule Fit.Sdk.Fields do
     23 => {:global_id, :byte, 0, 0},
     30 => {:height_setting, {:enum, :enum_display_measure}, 0, 0}
   }
-  def get(3, key), do: @_msg_3[key]
+  def get(3), do: @_msg_3
+  def get(3, key) do
+    @_msg_3[key]
+  end
 
   @_msg_6 %{
     254 => {:message_index, :message_index, 0, 0},
@@ -65,7 +69,10 @@ defmodule Fit.Sdk.Fields do
     23 => {:bike_spdcad_ant_id_trans_type, :uint8z, 0, 0},
     24 => {:bike_power_ant_id_trans_type, :uint8z, 0, 0}
   }
-  def get(6, key), do: @_msg_6[key]
+  def get(6), do: @_msg_6
+  def get(6, key) do
+    @_msg_6[key]
+  end
 
   @_msg_7 %{
     1 => {:max_heart_rate, :uint8, 0, 0},
@@ -74,7 +81,10 @@ defmodule Fit.Sdk.Fields do
     5 => {:hr_calc_type, :hr_zone_calc, 0, 0},
     7 => {:pwr_calc_type, :pwr_zone_calc, 0, 0}
   }
-  def get(7, key), do: @_msg_7[key]
+  def get(7), do: @_msg_7
+  def get(7, key) do
+    @_msg_7[key]
+  end
 
   @_msg_18 %{
     254 => {:message_index, :message_index, 0, 0},
@@ -193,7 +203,10 @@ defmodule Fit.Sdk.Fields do
     130 => {:max_lev_motor_power, :uint16, 0, 0},
     131 => {:lev_battery_consumption, :uint8, 2, 0}
   }
-  def get(18, key), do: @_msg_18[key]
+  def get(18), do: @_msg_18
+  def get(18, key) do
+    @_msg_18[key]
+  end
 
   @_msg_19 %{
     254 => {:message_index, :message_index, 0, 0},
@@ -305,7 +318,10 @@ defmodule Fit.Sdk.Fields do
     116 => {:max_lev_motor_power, :uint16, 0, 0},
     117 => {:lev_battery_consumption, :uint8, 2, 0}
   }
-  def get(19, key), do: @_msg_19[key]
+  def get(19), do: @_msg_19
+  def get(19, key) do
+    @_msg_19[key]
+  end
 
   @_msg_20 %{
     253 => {:timestamp, :date_time, 0, 0},
@@ -365,7 +381,10 @@ defmodule Fit.Sdk.Fields do
     81 => {:battery_soc, :uint8, 2, 0},
     82 => {:motor_power, :uint16, 0, 0}
   }
-  def get(20, key), do: @_msg_20[key]
+  def get(20), do: @_msg_20
+  def get(20, key) do
+    @_msg_20[key]
+  end
 
   @_msg_21 %{
     253 => {:timestamp, :date_time, 0, 0},
@@ -382,7 +401,10 @@ defmodule Fit.Sdk.Fields do
     12 => {:rear_gear, :uint8z, 0, 0},
     13 => {:device_index, :raw, 0, 0}
   }
-  def get(21, key), do: @_msg_21[key]
+  def get(21), do: @_msg_21
+  def get(21, key) do
+    @_msg_21[key]
+  end
 
   @_msg_22 %{
     253 => {:timestamp, :date_time, 0, 0},
@@ -392,7 +414,10 @@ defmodule Fit.Sdk.Fields do
     3 => {:altitude, :device_index, 0, 0},
     4 => {:heart, :device_index, 0, 0}
   }
-  def get(22, key), do: @_msg_22[key]
+  def get(22), do: @_msg_22
+  def get(22, key) do
+    @_msg_22[key]
+  end
 
   @_msg_23 %{
     253 => {:timestamp, :date_time, 0, 0},
@@ -416,7 +441,10 @@ defmodule Fit.Sdk.Fields do
     25 => {:source_type, {:enum, :enum_source_type}, 0, 0},
     27 => {:product_name, :string, 0, 0}
   }
-  def get(23, key), do: @_msg_23[key]
+  def get(23), do: @_msg_23
+  def get(23, key) do
+    @_msg_23[key]
+  end
 
   @_msg_34 %{
     253 => {:timestamp, :date_time, 0, 0},
@@ -428,13 +456,19 @@ defmodule Fit.Sdk.Fields do
     5 => {:local_timestamp, :local_date_time, 0, 0},
     6 => {:event_group, :uint8, 0, 0}
   }
-  def get(34, key), do: @_msg_34[key]
+  def get(34), do: @_msg_34
+  def get(34, key) do
+    @_msg_34[key]
+  end
 
   @_msg_49 %{
     0 => {:software_version, :uint16, 0, 0},
     1 => {:hardware_version, :uint8, 0, 0}
   }
-  def get(49, key), do: @_msg_49[key]
+  def get(49), do: @_msg_49
+  def get(49, key) do
+    @_msg_49[key]
+  end
 
   @_msg_72 %{
     253 => {:timestamp, :date_time, 0, 0},
@@ -444,14 +478,20 @@ defmodule Fit.Sdk.Fields do
     3 => {:serial_number, :uint32z, 0, 0},
     4 => {:time_created, :date_time, 0, 0}
   }
-  def get(72, key), do: @_msg_72[key]
+  def get(72), do: @_msg_72
+  def get(72, key) do
+    @_msg_72[key]
+  end
 
   @_msg_104 %{
     253 => {:timestamp, :date_time, 0, 0},
     0 => {:charge, :raw, 0, 0},
     2 => {:percent, :raw, 0, 0}
   }
-  def get(104, key), do: @_msg_104[key]
+  def get(104), do: @_msg_104
+  def get(104, key) do
+    @_msg_104[key]
+  end
 
   @_msg_142 %{
     254 => {:message_index, :message_index, 0, 0},
@@ -540,7 +580,10 @@ defmodule Fit.Sdk.Fields do
     81 => {:avg_cadence_position, :uint8, 0, 0},
     82 => {:max_cadence_position, :uint8, 0, 0}
   }
-  def get(142, key), do: @_msg_142[key]
+  def get(142), do: @_msg_142
+  def get(142, key) do
+    @_msg_142[key]
+  end
 
   @_msg_147 %{
     0 => {:serial_number, :raw, 0, 0},
@@ -553,7 +596,11 @@ defmodule Fit.Sdk.Fields do
     34 => {:software_version, :raw, 0, 0},
     254 => {:message_index, :message_index, 0, 0}
   }
-  def get(147, key), do: @_msg_147[key]
+  def get(147), do: @_msg_147
+  def get(147, key) do
+    @_msg_147[key]
+  end
 
+  def get(other), do: nil
   def get(_field, _key), do: nil
 end
